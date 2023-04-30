@@ -1,0 +1,58 @@
+package tolist
+
+import (
+	"encoding/csv"
+	"fmt"
+	"os"
+	"strconv"
+)
+
+func tolist(filepath string) ([]Tx, error) {
+	var txlist []Tx
+	var firstline []string
+	csvFile, err := os.Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println("Successfully Opened CSV file")
+	defer csvFile.Close()
+
+	csvLines, err := csv.NewReader(csvFile).ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	for _, line := range csvLines {
+		firstline = line
+		break
+	}
+	for _, line := range csvLines {
+		tx := Tx{}
+
+		for i := 0; i < len(line); i = i + 1 {
+			if firstline[i] == "Payee" {
+				if line[i] != "Payee" {
+					tx.payee = line[i]
+				}
+			}
+			if firstline[i] == "Amount" {
+				if line[i] != "Amount" {
+					f, err := strconv.ParseFloat(line[i], 32)
+					if err != nil {
+						return nil, err
+					}
+					tx.amount = float32(f)
+				}
+			}
+			if firstline[i] == "Category" {
+				if line[i] != "Category" {
+					tx.category = line[i]
+				}
+			}
+		}
+		if tx.category != "" {
+			txlist = append(txlist, tx)
+		}
+
+	}
+	return txlist, nil
+}

@@ -1,12 +1,14 @@
 // go run ./main.go
-
 package main
 
 import (
-	"encoding/csv"
+	"example/hello/calculate"
+	"example/hello/category"
+	"example/hello/csvtolist"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/wcharczuk/go-chart/v2"
 )
@@ -28,124 +30,124 @@ func findPeople(name string, people []Person) Person {
 	return theperson
 }
 func main() {
-	/*
-		fmt.Println("-----------------------------")
-		txList, err := tolist("/Users/xulei/creditcard/may.csv")
+
+	http.HandleFunc("/hh", func(w http.ResponseWriter, r *http.Request) {
+		path := "/Users/xulei/codes/creditcard/pies" // replace with your directory path
+		files, err := ioutil.ReadDir(path)
 		if err != nil {
-			fmt.Println(err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fmt.Println("-----------------------------")
-		for _, t := range txList {
-			fmt.Println("TX:")
-			fmt.Println(t.amount)
-			fmt.Println(t.payee)
-			fmt.Println(t.category)
+		body := `
+			<!DOCTYPE html>
+		<html lang="en">
+		  <head>
+			<meta charset="UTF-8" />
+			<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+			<meta http-equiv="X-UA-Compatible" content="ie=edge" />
+			<title>Document</title>
+		  </head>
+		  <body>
+			<form
+			  enctype="multipart/form-data"
+			  action="/upload"
+			  method="post"
+			>
+			  <input type="file" name="myFile" /></br>
+			  year:<input type="text" id="year" name="year" /></br>
+      		  month:<input type="text" id="month" name="month" /></br>
+			  <input type="submit" value="upload" />
+			  <ul>`
+		for _, file := range files {
+			filename := file.Name()
+			body = body + `<li><a href="image?path=202309.png">` + filename + `</a></li>`
 		}
-		category_output := tocategory(txList)
-		fmt.Println(calculate(category_output))
-	*/
+		body = body + `
+				</ul>
+			</form>
+	 	</body>
+	</html>
+		`
+		fmt.Fprintf(w, body)
+	})
+	http.HandleFunc("/upload", uploadFile)
+	http.HandleFunc("/image", image)
+	fmt.Println("-----------------------------")
+	http.ListenAndServe(":8081", nil)
+}
+
+func uploadFile(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("File Upload Endpoint Hit")
+
+	// Parse our multipart form, 10 << 20 specifies a maximum
+	// upload of 10 MB files.
+	r.ParseMultipartForm(10 << 20)
+	// FormFile returns the first file for the given key `myFile`
+	// it also returns the FileHeader so we can get the Filename,
+	// the Header and the size of the file
+	file, handler, err := r.FormFile("myFile")
+	if err != nil {
+		fmt.Println("Error Retrieving the File")
+		fmt.Println(err)
+		return
+	}
+	defer file.Close()
+	fmt.Printf("Uploaded File: %+v\n", handler.Filename)
+	fmt.Printf("File Size: %+v\n", handler.Size)
+	fmt.Printf("MIME Header: %+v\n", handler.Header)
+	year := r.FormValue("year")
+	if err != nil {
+		fmt.Println("Error Retrieving the File")
+		fmt.Println(err)
+		return
+	}
+	month := r.FormValue("month")
+	if err != nil {
+		fmt.Println("Error Retrieving the File")
+		fmt.Println(err)
+		return
+	}
+
+	// read all of the contents of our uploaded file into a
+	// byte array
+	fileBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// write this byte array to our temporary file
+	err = ioutil.WriteFile("uploadedfile", fileBytes, 999999999)
+	if err != nil {
+		fmt.Println(err)
+	}
+	// return that we have successfully uploaded our file!
+	fmt.Fprintf(w, "Successfully Uploaded File\n")
+	txList, err := csvtolist.Tolist("/Users/xulei/codes/creditcard/uploadedfile")
+	category_output := category.Tocategory(txList)
+	calculate_output := calculate.Calculate(category_output)
+	var values []chart.Value
+	for key, value := range calculate_output {
+		values = append(values, chart.Value{Label: key, Value: float64(value)})
+	}
 	pie := chart.PieChart{
 		Width:  512,
 		Height: 512,
-		Values: []chart.Value{
-			{Value: 5, Label: "Blue"},
-			{Value: 5, Label: "Green"},
-			{Value: 4, Label: "Gray"},
-			{Value: 4, Label: "Orange"},
-			{Value: 3, Label: "Deep Blue"},
-			{Value: 3, Label: "??"},
-			{Value: 1, Label: "!!"},
-		},
+		Values: values,
 	}
-
-	f, _ := os.Create("output.png")
+	f, _ := os.Create("/Users/xulei/codes/creditcard/pies/" + year + month + ".png")
 	defer f.Close()
 	pie.Render(chart.PNG, f)
-
 }
 
-type Tx struct {
-	payee    string  // ""
-	amount   float32 // 0
-	category string  // ""
-}
+func image(w http.ResponseWriter, r *http.Request) {
+	buf, err := ioutil.ReadFile("pie.png")
 
-func tolist(filepath string) ([]Tx, error) {
-	var txlist []Tx
-	var firstline []string
-	csvFile, err := os.Open(filepath)
 	if err != nil {
-		return nil, err
+		fmt.Println(err)
+		return
 	}
-	fmt.Println("Successfully Opened CSV file")
-	defer csvFile.Close()
 
-	csvLines, err := csv.NewReader(csvFile).ReadAll()
-	if err != nil {
-		return nil, err
-	}
-	for _, line := range csvLines {
-		firstline = line
-		break
-	}
-	for _, line := range csvLines {
-		tx := Tx{}
+	w.Header().Set("Content-Type", "image/png")
 
-		for i := 0; i < len(line); i = i + 1 {
-			if firstline[i] == "Payee" {
-				if line[i] != "Payee" {
-					tx.payee = line[i]
-				}
-			}
-			if firstline[i] == "Amount" {
-				if line[i] != "Amount" {
-					f, err := strconv.ParseFloat(line[i], 32)
-					if err != nil {
-						return nil, err
-					}
-					tx.amount = float32(f)
-				}
-			}
-			if firstline[i] == "Category" {
-				if line[i] != "Category" {
-					tx.category = line[i]
-				}
-			}
-		}
-		if tx.category != "" {
-			txlist = append(txlist, tx)
-		}
+	w.Write(buf)
 
-	}
-	return txlist, nil
-}
-func tocategory(txlist []Tx) map[string][]Tx {
-	txmap := make(map[string][]Tx)
-	for _, tx := range txlist {
-		if _, ok := txmap[tx.category]; !ok {
-			txmap[tx.category] = []Tx{}
-		}
-		txmap[tx.category] = append(txmap[tx.category], tx)
-	}
-	return txmap
-}
-func calculate(categoryoutput map[string][]Tx) map[string]float32 {
-	catPercMap := make(map[string]float32)
-	var totalamount float32
-	for _, value := range categoryoutput {
-		for _, tx := range value {
-			totalamount = totalamount + -tx.amount
-		}
-	}
-	for key, value := range categoryoutput {
-		var totalcategory float32
-		for _, tx := range value {
-			totalcategory = totalcategory + -tx.amount
-		}
-		categoryPercent := totalcategory / totalamount * 100
-		catPercMap[key] = categoryPercent
-		fmt.Println(totalamount)
-	}
-	return catPercMap
 }
