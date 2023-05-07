@@ -58,9 +58,10 @@ func main() {
       		  month:<input type="text" id="month" name="month" /></br>
 			  <input type="submit" value="upload" />
 			  <ul>`
+		var filename string
 		for _, file := range files {
-			filename := file.Name()
-			body = body + `<li><a href="image?path=202309.png">` + filename + `</a></li>`
+			filename = file.Name()
+			body = body + `<li><a href=/upload/image?path=` + filename + `>` + filename + `</a></li>`
 		}
 		body = body + `
 				</ul>
@@ -71,7 +72,18 @@ func main() {
 		fmt.Fprintf(w, body)
 	})
 	http.HandleFunc("/upload", uploadFile)
-	http.HandleFunc("/image", image)
+	http.HandleFunc("/upload/image", func(w http.ResponseWriter, r *http.Request) {
+		name := r.URL.Query().Get("path")
+		buf, err := ioutil.ReadFile("/Users/xulei/codes/creditcard/pies/" + name)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/png")
+
+		w.Write(buf)
+	})
 	fmt.Println("-----------------------------")
 	http.ListenAndServe(":8081", nil)
 }
@@ -136,18 +148,4 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	f, _ := os.Create("/Users/xulei/codes/creditcard/pies/" + year + month + ".png")
 	defer f.Close()
 	pie.Render(chart.PNG, f)
-}
-
-func image(w http.ResponseWriter, r *http.Request) {
-	buf, err := ioutil.ReadFile("pie.png")
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "image/png")
-
-	w.Write(buf)
-
 }
