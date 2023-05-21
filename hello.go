@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/wcharczuk/go-chart/v2"
 )
@@ -32,12 +33,17 @@ func findPeople(name string, people []Person) Person {
 func main() {
 
 	http.HandleFunc("/hh", func(w http.ResponseWriter, r *http.Request) {
-		path := "/Users/xulei/codes/creditcard/pies" // replace with your directory path
+		path := "/Users/shaom/codes/creditcard/pies" // replace with your directory path
 		files, err := ioutil.ReadDir(path)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		/*t, err := template.ParseFiles("hellotemplate.html")
+		if err != nil {
+			log.Fatal(err)
+		}
+		*/
 		body := `
 			<!DOCTYPE html>
 		<html lang="en">
@@ -58,10 +64,9 @@ func main() {
       		  month:<input type="text" id="month" name="month" /></br>
 			  <input type="submit" value="upload" />
 			  <ul>`
-		var filename string
+
 		for _, file := range files {
-			filename = file.Name()
-			body = body + `<li><a href=/upload/image?path=` + filename + `>` + filename + `</a></li>`
+			body = body + `<li><a href=/upload/image?path=` + file.Name() + `>` + file.Name() + `</a></li>`
 		}
 		body = body + `
 				</ul>
@@ -70,11 +75,22 @@ func main() {
 	</html>
 		`
 		fmt.Fprintf(w, body)
+		/*err = t.Execute(os.Stdout, data)
+		if err != nil {
+			log.Fatal(err)
+		}
+		*/
 	})
 	http.HandleFunc("/upload", uploadFile)
 	http.HandleFunc("/upload/image", func(w http.ResponseWriter, r *http.Request) {
 		name := r.URL.Query().Get("path")
-		buf, err := ioutil.ReadFile("/Users/xulei/codes/creditcard/pies/" + name)
+		absPath, err := filepath.Abs("pies")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		buf, err := ioutil.ReadFile(absPath + "/" + name)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -133,7 +149,12 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	// return that we have successfully uploaded our file!
 	fmt.Fprintf(w, "Successfully Uploaded File\n")
-	txList, err := csvtolist.Tolist("/Users/xulei/codes/creditcard/uploadedfile")
+	dir, err := os.Getwd()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	txList, err := csvtolist.Tolist(dir)
 	category_output := category.Tocategory(txList)
 	calculate_output := calculate.Calculate(category_output)
 	var values []chart.Value
@@ -145,7 +166,12 @@ func uploadFile(w http.ResponseWriter, r *http.Request) {
 		Height: 512,
 		Values: values,
 	}
-	f, _ := os.Create("/Users/xulei/codes/creditcard/pies/" + year + month + ".png")
+	dir, err = os.Getwd()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	f, _ := os.Create(dir + year + month + ".png")
 	defer f.Close()
 	pie.Render(chart.PNG, f)
 }
