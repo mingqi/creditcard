@@ -17,10 +17,10 @@
       		  month:<input type="text" id="month" name="month" /></br>
 			  <input type="submit" value="upload" />
 			  <ul>
-				{{range  .Files}}
-					<li><a href=/upload/image?path= + {{data.Filefunction}} + > + {{data.Filefunction}} + </a></li>
+				{{range .Filearrey}}
+					<li><a href="/upload/image?path={{.File}}" > {{.Year}} / {{.Month}} </a></li>
+				{{end}}
 			  </ul>
 				</form>
 			 </body>
 		</html>
-

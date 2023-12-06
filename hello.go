@@ -6,10 +6,13 @@ import (
 	"example/hello/category"
 	"example/hello/csvtolist"
 	"fmt"
+	"html/template"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/wcharczuk/go-chart/v2"
 )
@@ -30,56 +33,66 @@ func findPeople(name string, people []Person) Person {
 	}
 	return theperson
 }
-func main() {
 
+type Filename struct {
+	Year  string
+	Month string
+	File  string
+}
+type Data struct {
+	Filearrey []Filename
+}
+
+func main() {
 	http.HandleFunc("/hh", func(w http.ResponseWriter, r *http.Request) {
+		var v Filename
 		path := "/Users/shaom/codes/creditcard/pies" // replace with your directory path
 		files, err := ioutil.ReadDir(path)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		/*t, err := template.ParseFiles("hellotemplate.html")
+		t, err := template.ParseFiles("hellotemplate.html")
 		if err != nil {
 			log.Fatal(err)
 		}
-		*/
-		body := `
-			<!DOCTYPE html>
-		<html lang="en">
-		  <head>
-			<meta charset="UTF-8" />
-			<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-			<meta http-equiv="X-UA-Compatible" content="ie=edge" />
-			<title>Document</title>
-		  </head>
-		  <body>
-			<form
-			  enctype="multipart/form-data"
-			  action="/upload"
-			  method="post"
-			>
-			  <input type="file" name="myFile" /></br>
-			  year:<input type="text" id="year" name="year" /></br>
-      		  month:<input type="text" id="month" name="month" /></br>
-			  <input type="submit" value="upload" />
-			  <ul>`
+		var data Data
+		for i, file := range files {
+			filename := []byte(file.Name())
+			if len(filename) != 10 {
+				continue
+			}
+			if string([]byte(file.Name())[7])+string([]byte(file.Name())[8])+string([]byte(file.Name())[9]) != "png" {
+				continue
+			}
 
-		for _, file := range files {
-			body = body + `<li><a href=/upload/image?path=` + file.Name() + `>` + file.Name() + `</a></li>`
+			year, err := strconv.Atoi(string(filename[0:4]))
+			if err != nil {
+				continue
+			}
+			if 2000 >= year || year >= 2999 {
+				continue
+			}
+			month, err := strconv.Atoi(string(filename[4:6]))
+			if err != nil {
+				continue
+			}
+			if month < 1 || month > 12 {
+				continue
+			}
+
+			data.Filearrey = append(data.Filearrey, v)
+			data.Filearrey[i].File = file.Name()
+			data.Filearrey[i].Year = fmt.Sprint(year)
+			data.Filearrey[i].Month = fmt.Sprint(month)
 		}
-		body = body + `
-				</ul>
-			</form>
-	 	</body>
-	</html>
-		`
-		fmt.Fprintf(w, body)
-		/*err = t.Execute(os.Stdout, data)
+
+		fmt.Print(data.Filearrey)
+		err = t.Execute(w, data)
+		fmt.Println("aaa")
 		if err != nil {
 			log.Fatal(err)
 		}
-		*/
 	})
 	http.HandleFunc("/upload", uploadFile)
 	http.HandleFunc("/upload/image", func(w http.ResponseWriter, r *http.Request) {
